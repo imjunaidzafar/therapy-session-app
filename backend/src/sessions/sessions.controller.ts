@@ -17,6 +17,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { SessionsService } from './sessions.service';
 import { SearchSessionsDto } from './dto/search-sessions.dto';
 
+const ALLOWED_AUDIO_MIMES = [
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/wave',
+  'audio/x-wav',
+  'audio/mp4',
+  'audio/m4a',
+  'audio/x-m4a',
+  'audio/webm',
+  'audio/ogg',
+  'audio/flac',
+];
+
 @Controller('sessions')
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
@@ -27,33 +41,15 @@ export class SessionsController {
       storage: diskStorage({
         destination: './uploads',
         filename: (req, file, callback) => {
-          const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
-          callback(null, uniqueName);
+          callback(null, `${uuidv4()}${extname(file.originalname)}`);
         },
       }),
       fileFilter: (req, file, callback) => {
-        // Accept common audio formats
-        const allowedMimes = [
-          'audio/mpeg',
-          'audio/mp3',
-          'audio/wav',
-          'audio/wave',
-          'audio/x-wav',
-          'audio/mp4',
-          'audio/m4a',
-          'audio/x-m4a',
-          'audio/webm',
-          'audio/ogg',
-          'audio/flac',
-        ];
-
-        if (allowedMimes.includes(file.mimetype)) {
+        if (ALLOWED_AUDIO_MIMES.includes(file.mimetype)) {
           callback(null, true);
         } else {
           callback(
-            new BadRequestException(
-              `Unsupported file type: ${file.mimetype}. Supported types: MP3, WAV, M4A, WebM, OGG, FLAC`,
-            ),
+            new BadRequestException(`Unsupported file type: ${file.mimetype}`),
             false,
           );
         }
@@ -63,9 +59,7 @@ export class SessionsController {
   async uploadAudio(
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 100 * 1024 * 1024 }), // 100MB
-        ],
+        validators: [new MaxFileSizeValidator({ maxSize: 100 * 1024 * 1024 })],
       }),
     )
     file: Express.Multer.File,
@@ -74,22 +68,14 @@ export class SessionsController {
       throw new BadRequestException('No audio file provided');
     }
 
-    // Create session record
-    const session = await this.sessionsService.create(
-      file.originalname,
-      file.size,
-    );
-
-    // Start processing in background (don't await)
+    const session = await this.sessionsService.create(file.originalname, file.size);
     const filePath = join(process.cwd(), file.path);
+
     this.sessionsService.processSession(session.id, filePath).catch((err) => {
       console.error('Background processing failed:', err);
     });
 
-    return {
-      id: session.id,
-      message: 'Upload successful. Processing started.',
-    };
+    return { id: session.id, message: 'Upload successful. Processing started.' };
   }
 
   @Get()
@@ -114,12 +100,9 @@ export class SessionsController {
 
   @Post('search')
   async search(@Body() searchDto: SearchSessionsDto) {
-    if (!searchDto.query || searchDto.query.trim().length === 0) {
+    if (!searchDto.query?.trim()) {
       throw new BadRequestException('Search query is required');
     }
-    return this.sessionsService.searchSessions(
-      searchDto.query,
-      searchDto.limit || 10,
-    );
+    return this.sessionsService.searchSessions(searchDto.query, searchDto.limit || 10);
   }
 }
