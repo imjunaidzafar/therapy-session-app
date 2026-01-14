@@ -21,10 +21,7 @@ export class SessionsService {
     private vectorizationService: VectorizationService,
   ) {}
 
-  async create(
-    originalFilename: string,
-    fileSize: number,
-  ): Promise<Session> {
+  async create(originalFilename: string, fileSize: number): Promise<Session> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('sessions')
@@ -74,11 +71,7 @@ export class SessionsService {
     return data as Session;
   }
 
-  async updateStatus(
-    id: string,
-    status: SessionStatus,
-    errorMessage?: string,
-  ): Promise<void> {
+  async updateStatus(id: string, status: SessionStatus, errorMessage?: string): Promise<void> {
     const updateData: Record<string, unknown> = { status };
     if (errorMessage) {
       updateData.error_message = errorMessage;
@@ -99,12 +92,9 @@ export class SessionsService {
     this.logger.log(`Starting processing for session: ${sessionId}`);
 
     try {
-      // Step 1: Transcription
       await this.updateStatus(sessionId, 'transcribing');
-      const transcriptionResult =
-        await this.transcriptionService.transcribe(filePath);
+      const transcriptionResult = await this.transcriptionService.transcribe(filePath);
 
-      // Update with transcription results
       await this.supabaseService
         .getClient()
         .from('sessions')
@@ -118,30 +108,19 @@ export class SessionsService {
         })
         .eq('id', sessionId);
 
-      // Step 2: Summarization
-      const summary = await this.summarizationService.summarize(
-        transcriptionResult.fullText,
-      );
+      const summary = await this.summarizationService.summarize(transcriptionResult.fullText);
 
       await this.supabaseService
         .getClient()
         .from('sessions')
-        .update({
-          summary,
-          status: 'vectorizing',
-        })
+        .update({ summary, status: 'vectorizing' })
         .eq('id', sessionId);
 
-      // Step 3: Vectorization
-      // Combine transcript and summary for embedding
       const textForEmbedding = `${transcriptionResult.fullText}\n\nSummary:\n${summary}`;
-      const embedding =
-        await this.vectorizationService.generateEmbedding(textForEmbedding);
-
-      // Store embedding as JSON array string for pgvector
+      const embedding = await this.vectorizationService.generateEmbedding(textForEmbedding);
       const embeddingStr = `[${embedding.join(',')}]`;
 
-      await this.supabaseService
+      const { error: embeddingError } = await this.supabaseService
         .getClient()
         .from('sessions')
         .update({
@@ -151,9 +130,13 @@ export class SessionsService {
         })
         .eq('id', sessionId);
 
+      if (embeddingError) {
+        this.logger.error(`Failed to save embedding: ${embeddingError.message}`);
+        throw new Error(`Failed to save embedding: ${embeddingError.message}`);
+      }
+
       this.logger.log(`Processing completed for session: ${sessionId}`);
 
-      // Clean up temp file
       try {
         fs.unlinkSync(filePath);
       } catch {
@@ -167,29 +150,20 @@ export class SessionsService {
         error instanceof Error ? error.message : 'Unknown error',
       );
 
-      // Clean up temp file on error too
       try {
         fs.unlinkSync(filePath);
-      } catch {
-        // Ignore cleanup errors
-      }
+      } catch {}
 
       throw error;
     }
   }
 
-  async searchSessions(
-    query: string,
-    limit: number = 10,
-  ): Promise<SessionWithSimilarity[]> {
+  async searchSessions(query: string, limit: number = 10): Promise<SessionWithSimilarity[]> {
     this.logger.log(`Searching sessions with query: "${query}"`);
 
-    // Generate embedding for query
-    const queryEmbedding =
-      await this.vectorizationService.generateEmbedding(query);
+    const queryEmbedding = await this.vectorizationService.generateEmbedding(query);
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-    // Perform semantic search using pgvector
     const { data, error } = await this.supabaseService
       .getClient()
       .rpc('search_sessions', {
