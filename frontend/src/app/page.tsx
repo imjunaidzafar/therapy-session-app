@@ -96,7 +96,7 @@ export default function Home() {
           <h2 className="text-lg font-semibold text-gray-900 mb-3">
             Semantic Search
           </h2>
-          <SearchBar onSearch={handleSearch} isSearching={searching} />
+          <SearchBar onSearch={handleSearch} onClear={clearSearch} isSearching={searching} />
           {searchResults !== null && (
             <div className="mt-2 flex items-center justify-between">
               <span className="text-sm text-gray-600">
