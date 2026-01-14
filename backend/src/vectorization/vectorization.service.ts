@@ -19,8 +19,7 @@ export class VectorizationService {
     this.logger.log('Generating embedding...');
 
     try {
-      // Truncate text if too long (ada-002 has 8191 token limit)
-      const truncatedText = this.truncateText(text, 8000);
+      const truncatedText = text.length > 8000 ? text.substring(0, 8000) + '...' : text;
 
       const response = await this.openai.embeddings.create({
         model: 'text-embedding-ada-002',
@@ -28,7 +27,6 @@ export class VectorizationService {
       });
 
       const embedding = response.data[0]?.embedding;
-
       if (!embedding) {
         throw new Error('No embedding returned from OpenAI');
       }
@@ -39,13 +37,5 @@ export class VectorizationService {
       this.logger.error('Embedding generation failed', error);
       throw error;
     }
-  }
-
-  private truncateText(text: string, maxChars: number): string {
-    // Simple truncation - in production, use proper tokenization
-    if (text.length <= maxChars) {
-      return text;
-    }
-    return text.substring(0, maxChars) + '...';
   }
 }
