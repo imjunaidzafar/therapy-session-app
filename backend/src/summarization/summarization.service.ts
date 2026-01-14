@@ -24,17 +24,17 @@ export class SummarizationService {
         messages: [
           {
             role: 'system',
-            content: `You are an expert therapy session summarizer. Your task is to provide concise, professional summaries of therapy sessions that capture the key elements while maintaining patient confidentiality and clinical relevance.`,
+            content: `You are an expert therapy session summarizer. Provide concise, professional summaries that capture key elements while maintaining clinical relevance.`,
           },
           {
             role: 'user',
-            content: `Please summarize the following therapy session transcript. Include:
+            content: `Summarize this therapy session transcript. Include:
 1. Main topics discussed
-2. Key emotional themes or concerns expressed
-3. Any progress or insights noted
-4. Action items or follow-ups mentioned (if any)
+2. Key emotional themes or concerns
+3. Progress or insights noted
+4. Action items mentioned (if any)
 
-Keep the summary concise (2-4 paragraphs).
+Keep it to 2-4 paragraphs.
 
 Transcript:
 ${transcript}`,
